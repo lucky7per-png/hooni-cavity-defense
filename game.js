@@ -19,9 +19,11 @@ const CONFIG = {
   playerSpeed: 390,        // 의사 이동 속도 (px/초)
   baseFallSpeed: 240,      // 1단계 낙하 속도 (px/초)
   levelEvery: 8,           // 몇 초마다 단계 상승
-  levelJump: 2,            // 2단계부터 난이도를 몇 단계 앞당길지 (2 → 2단계 = 예전 4단계 난이도)
-  maxSpeedMul: 3.0,        // 속도 상한
-  minInterval: 0.2,        // 나오는 간격 하한 (초)
+  maxLevel: 20,            // 최고 단계 (이 단계에서 난이도 최대)
+  level2SpeedMul: 1.5,     // 2단계 속도 (예전 4단계 수준으로 시작)
+  maxSpeedMul: 3.5,        // 20단계 속도 (최고)
+  level2Interval: 0.66,    // 2단계 나오는 간격 (초)
+  minInterval: 0.18,       // 20단계 나오는 간격 (초, 가장 짧음)
   invincibleTime: 0.8,     // 맞은 뒤 무적 시간 (초)
   lanes: 8,                // 단것이 떨어지는 칸 수
   maxLives: 5,             // 생명 최대치 (치약·가그린으로 늘릴 수 있는 한도)
@@ -34,17 +36,17 @@ const CONFIG = {
 const TOOTH_COUNT = 16;    // 윗니 8개 + 아랫니 8개
 
 // 단계별 난이도 계산
-function difficulty(shownLevel) {
-  // 1단계는 몸풀기. 2단계부터는 2단계를 건너뛰어(예전 4단계 난이도부터) 시작해서 점점 올라감
-  const level = shownLevel >= 2 ? shownLevel + CONFIG.levelJump : shownLevel;
-  const speedMul = Math.min(1 + (level - 1) * 0.16, CONFIG.maxSpeedMul);
-  const interval = Math.max(0.85 - (level - 1) * 0.065, CONFIG.minInterval);
+// 1단계는 몸풀기. 2단계에서 한 번에 어려워지고, 20단계까지 고르게 올라감
+function difficulty(level) {
+  if (level < 2) return { speedMul: 1, interval: 0.85, minCount: 1, maxCount: 1 };
+  const t = Math.min(level - 2, CONFIG.maxLevel - 2) / (CONFIG.maxLevel - 2); // 2단계=0 → 20단계=1
+  const speedMul = CONFIG.level2SpeedMul + (CONFIG.maxSpeedMul - CONFIG.level2SpeedMul) * t;
+  const interval = CONFIG.level2Interval + (CONFIG.minInterval - CONFIG.level2Interval) * t;
   let minCount, maxCount;
-  if (level < 2)       { minCount = 1; maxCount = 1; }
-  else if (level < 4)  { minCount = 1; maxCount = 2; }
-  else if (level < 7)  { minCount = 2; maxCount = 2; }
-  else if (level < 11) { minCount = 2; maxCount = 3; }
-  else                 { minCount = 3; maxCount = 3; }
+  if (level < 5)       { minCount = 2; maxCount = 2; }
+  else if (level < 10) { minCount = 2; maxCount = 3; }
+  else if (level < 16) { minCount = 3; maxCount = 3; }
+  else                 { minCount = 3; maxCount = 4; }
   return { speedMul, interval, minCount, maxCount };
 }
 
@@ -168,10 +170,15 @@ function update(dt) {
   elapsed += dt;
 
   // 단계 상승
-  const newLevel = Math.floor(elapsed / CONFIG.levelEvery) + 1;
+  const newLevel = Math.min(Math.floor(elapsed / CONFIG.levelEvery) + 1, CONFIG.maxLevel);
   if (newLevel > level) {
     level = newLevel;
-    popups.push({ text: "LEVEL UP!", x: W / 2, y: H / 2 - 60, life: 1.2, size: 42, color: "#ffe68a" });
+    const isMax = level === CONFIG.maxLevel;
+    popups.push({
+      text: isMax ? "최고 난이도!" : "LEVEL UP!",
+      x: W / 2, y: H / 2 - 60, life: isMax ? 2 : 1.2, size: 42,
+      color: isMax ? "#ff7a7a" : "#ffe68a",
+    });
   }
 
   // 의사 이동
@@ -629,7 +636,7 @@ function drawHUD() {
   // 단계
   ctx.font = "bold 20px 'Malgun Gothic', sans-serif";
   ctx.textAlign = "right";
-  const lTxt = `Lv.${level}`;
+  const lTxt = level >= CONFIG.maxLevel ? `Lv.${level} MAX` : `Lv.${level}`;
   ctx.strokeText(lTxt, W - 58, 24);
   ctx.fillText(lTxt, W - 58, 24);
 }
