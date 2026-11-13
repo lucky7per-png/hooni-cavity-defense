@@ -94,6 +94,38 @@ button { font-family: inherit; cursor: pointer; border: none; }
   color: #fff;
 }
 
+#specialBtn {
+  position: absolute;
+  right: 3%;
+  bottom: 2%;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff7b0, #ffd700 55%, #e09b00);
+  color: #6b3a00;
+  font-size: 15px;
+  font-weight: bold;
+  line-height: 1.1;
+  box-shadow: 0 0 16px 4px rgba(255, 215, 0, 0.75), 0 4px 0 #b37a00;
+  z-index: 5;
+  animation: glow 0.9s ease-in-out infinite alternate;
+  touch-action: manipulation;
+}
+#specialBtn:active { transform: translateY(3px); }
+#specialBtn.used {
+  background: #8a8a8a;
+  color: #e6e6e6;
+  box-shadow: none;
+  animation: none;
+  cursor: default;
+  opacity: 0.7;
+  font-size: 13px;
+}
+@keyframes glow {
+  from { box-shadow: 0 0 10px 2px rgba(255, 215, 0, 0.6), 0 4px 0 #b37a00; }
+  to   { box-shadow: 0 0 24px 8px rgba(255, 230, 80, 0.95), 0 4px 0 #b37a00; }
+}
+
 #pauseBtn {
   position: absolute;
   top: 1.5%;

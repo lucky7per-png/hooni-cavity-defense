@@ -31,6 +31,8 @@ const CONFIG = {
   healMaxGap: 17,         // 회복 아이템 최대 간격 (초)
   fullLifeBonus: 50,       // 생명이 가득 찼을 때 회복 아이템 보너스 점수
   rotSpeed: 1.6,           // 이가 썩어 가는/회복되는 속도
+  superDuration: 5,        // 필살기(퓨전) 무적 시간 (초)
+  praiseDuration: 3.5,     // 20단계 "너 임마 멋지다!" 표시 시간 (초)
 };
 
 const TOOTH_COUNT = 16;    // 윗니 8개 + 아랫니 8개
@@ -55,6 +57,7 @@ let state = "start"; // start | playing | paused | over
 let player, items, particles, popups;
 let elapsed, spawnTimer, lives, dodged, level, shake, invincible;
 let healTimer, bonus, healed, toothRot, rotOrder;
+let superTime = 0, superUsed = false, partner = null, praiseTime = 0;
 let bestScore = Number(localStorage.getItem("dentistBest") || 0);
 
 const keys = { left: false, right: false };
@@ -80,6 +83,62 @@ function resetGame() {
   toothRot = new Array(TOOTH_COUNT).fill(0);
   // 어떤 이부터 썩을지 매 판 무작위 순서로 정함
   rotOrder = [...Array(TOOTH_COUNT).keys()].sort(() => Math.random() - 0.5);
+  // 필살기는 한 판에 한 번
+  superTime = 0;
+  superUsed = false;
+  partner = null;
+  praiseTime = 0;
+  updateSpecialButton();
+}
+
+// ---------- 필살기: 후니, 규니 퓨전 ----------
+function useSpecial() {
+  if (state !== "playing" || superUsed) return;
+  superUsed = true;
+  superTime = CONFIG.superDuration;
+  // 규니가 훈이 뒤쪽에서 등장
+  partner = { x: clampX(player.x - player.dir * 62), dir: player.dir, walk: 0 };
+  shake = 0.3;
+  burst(player.x, FLOOR_Y - 50, "#ffd700", 24);
+  burst(partner.x, FLOOR_Y - 40, "#fff3a0", 16);
+  popups.push({ text: "후니, 규니 퓨전", x: W / 2, y: H / 2 - 120, life: 2.2, size: 46, color: "#ffd700", font: GUNGSEO, still: true });
+  updateSpecialButton();
+}
+
+function updateSpecial(dt) {
+  if (superTime <= 0) return;
+  superTime -= dt;
+  // 규니는 훈이 뒤를 따라다님
+  const targetX = clampX(player.x - player.dir * 62);
+  const diff = targetX - partner.x;
+  const step = CONFIG.playerSpeed * 1.2 * dt;
+  partner.x += Math.abs(diff) < step ? diff : Math.sign(diff) * step;
+  if (Math.abs(diff) > 2) {
+    partner.dir = Math.sign(diff);
+    partner.walk += dt * 14;
+  } else {
+    partner.dir = player.dir;
+    partner.walk = 0;
+  }
+  if (superTime <= 0) {
+    superTime = 0;
+    burst(partner.x, FLOOR_Y - 40, "#fff3a0", 12);
+    partner = null;
+    invincible = 0.6; // 퓨전이 풀린 직후 잠깐 여유
+    popups.push({ text: "퓨전 해제", x: player.x, y: FLOOR_Y - player.h - 20, life: 0.9, size: 22, color: "#fff3a0" });
+  }
+}
+
+function clampX(x) {
+  return Math.max(player.w / 2 + 4, Math.min(W - player.w / 2 - 4, x));
+}
+
+function updateSpecialButton() {
+  const btn = document.getElementById("specialBtn");
+  if (!btn) return;
+  btn.disabled = superUsed;
+  btn.classList.toggle("used", superUsed);
+  btn.innerHTML = superUsed ? "사용<br>완료" : "필살기";
 }
 
 const nextHealGap = () => CONFIG.healMinGap + Math.random() * (CONFIG.healMaxGap - CONFIG.healMinGap);
@@ -173,13 +232,17 @@ function update(dt) {
   const newLevel = Math.min(Math.floor(elapsed / CONFIG.levelEvery) + 1, CONFIG.maxLevel);
   if (newLevel > level) {
     level = newLevel;
-    const isMax = level === CONFIG.maxLevel;
-    popups.push({
-      text: isMax ? "최고 난이도!" : "LEVEL UP!",
-      x: W / 2, y: H / 2 - 60, life: isMax ? 2 : 1.2, size: 42,
-      color: isMax ? "#ff7a7a" : "#ffe68a",
-    });
+    if (level === CONFIG.maxLevel) {
+      // 20단계 달성: 따봉 치과의사 + 궁서체 칭찬
+      praiseTime = CONFIG.praiseDuration;
+      burst(W / 2, H / 2 - 60, "#ffd700", 30);
+      popups.push({ text: "너 임마 멋지다!", x: W / 2, y: H / 2 - 225, life: CONFIG.praiseDuration, size: 48, color: "#ffe14d", font: GUNGSEO, still: true });
+    } else {
+      popups.push({ text: "LEVEL UP!", x: W / 2, y: H / 2 - 60, life: 1.2, size: 42, color: "#ffe68a" });
+    }
   }
+  if (praiseTime > 0) praiseTime -= dt;
+  updateSpecial(dt);
 
   // 의사 이동
   let move = 0;
@@ -244,6 +307,19 @@ function update(dt) {
       continue;
     }
 
+    // 퓨전 중: 훈이나 규니에게 닿은 단것은 금빛으로 부서짐 (무적)
+    if (superTime > 0) {
+      const pr = partner ? { x: partner.x - 14, y: FLOOR_Y - 70, w: 28, h: 70 } : null;
+      const hitPartner = pr &&
+        it.x + r > pr.x && it.x - r < pr.x + pr.w &&
+        it.y + r > pr.y && it.y - r < pr.y + pr.h;
+      if (hit || hitPartner) {
+        items.splice(i, 1);
+        burst(it.x, it.y, "#ffd700", 8);
+        continue;
+      }
+    }
+
     if (hit && invincible <= 0) {
       items.splice(i, 1);
       onHit(it);
@@ -284,7 +360,7 @@ function updateEffects(dt) {
   }
   for (let i = popups.length - 1; i >= 0; i--) {
     popups[i].life -= dt;
-    popups[i].y -= 30 * dt;
+    if (!popups[i].still) popups[i].y -= 30 * dt;
     if (popups[i].life <= 0) popups.splice(i, 1);
   }
 }
@@ -304,7 +380,12 @@ function draw() {
 
   drawMouth();
   items.forEach(drawItem);
-  drawDentist();
+  // 퓨전 중이면 규니(키 작은 치과의사)도 함께
+  const fused = superTime > 0;
+  if (partner) drawDentist(partner.x, partner.dir, partner.walk, { scale: 0.8, gold: true, glasses: true });
+  // 무적 시간(맞은 직후)에는 깜빡임
+  const blinkOff = !fused && invincible > 0 && Math.floor(invincible * 12) % 2 === 0;
+  if (!blinkOff) drawDentist(player.x, player.dir, player.walk, { gold: fused });
   drawLowerTeethFront();
   particles.forEach((p) => {
     ctx.globalAlpha = Math.max(0, p.life * 2);
@@ -317,6 +398,7 @@ function draw() {
 
   ctx.restore();
 
+  drawPraise();
   if (state !== "start") drawHUD();
   popups.forEach(drawPopup);
 }
@@ -527,19 +609,60 @@ function drawItem(it) {
   ctx.restore();
 }
 
-function drawDentist() {
-  // 무적 시간에는 깜빡임
-  if (invincible > 0 && Math.floor(invincible * 12) % 2 === 0) return;
+// 초사이어인처럼 노랗게 타오르는 기운 (발 위치 기준)
+function drawGoldAura(x, feet, scale) {
+  const t = performance.now() / 1000;
+  ctx.save();
+  ctx.translate(x, feet);
+  ctx.scale(scale, scale);
+  // 바깥 빛
+  const g = ctx.createRadialGradient(0, -50, 10, 0, -50, 75);
+  g.addColorStop(0, "rgba(255, 245, 150, 0.55)");
+  g.addColorStop(0.6, "rgba(255, 210, 40, 0.45)");
+  g.addColorStop(1, "rgba(255, 200, 0, 0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(0, -50, 52, 78, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // 위로 솟는 불꽃 모양
+  ctx.fillStyle = "rgba(255, 215, 40, 0.5)";
+  ctx.beginPath();
+  ctx.moveTo(-38, 0);
+  const spikes = 7;
+  for (let i = 0; i <= spikes; i++) {
+    const px = -38 + (76 * i) / spikes;
+    const flick = Math.sin(t * 18 + i * 1.7) * 10;
+    const peak = -(i === 0 || i === spikes ? 40 : 105 - Math.abs(i - spikes / 2) * 12) + flick;
+    ctx.lineTo(px - 38 / spikes, peak * 0.85);
+    ctx.lineTo(px, peak);
+  }
+  ctx.lineTo(38, 0);
+  ctx.closePath();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.fill();
+  ctx.restore();
+}
 
-  const x = player.x, feet = FLOOR_Y + 4;
-  const bob = Math.abs(Math.sin(player.walk)) * 3;
-  const d = player.dir;
+// 치과의사 그리기
+//  opts.scale: 크기, opts.gold: 노란 빛(퓨전), opts.thumbsUp: 따봉 자세, opts.glasses: 안경(규니)
+function drawDentist(x, dir, walk, opts = {}) {
+  const { scale = 1, gold = false, thumbsUp = false, glasses = false, feet = FLOOR_Y + 4 } = opts;
+  const bob = Math.abs(Math.sin(walk)) * 3;
+  const d = dir;
+
+  if (gold) drawGoldAura(x, feet - bob, scale);
 
   ctx.save();
   ctx.translate(x, feet - bob);
+  ctx.scale(scale, scale);
+  if (gold) {
+    ctx.shadowColor = "#ffd700";
+    ctx.shadowBlur = 18;
+  }
+  const walkLeg = walk;
 
   // 다리
-  const legSwing = Math.sin(player.walk) * 5;
+  const legSwing = Math.sin(walkLeg) * 5;
   ctx.fillStyle = "#3b4a6b";
   ctx.fillRect(-13 + legSwing, -24, 10, 24);
   ctx.fillRect(3 - legSwing, -24, 10, 24);
@@ -548,8 +671,8 @@ function drawDentist() {
   ctx.fillRect(-15 + legSwing, -5, 14, 6);
   ctx.fillRect(1 - legSwing, -5, 14, 6);
 
-  // 흰 가운
-  ctx.fillStyle = "#ffffff";
+  // 흰 가운 (퓨전 중에는 금빛)
+  ctx.fillStyle = gold ? "#fff6c2" : "#ffffff";
   ctx.strokeStyle = "#c5ced8";
   ctx.lineWidth = 2;
   roundRect(-22, -62, 44, 44, 10);
@@ -560,6 +683,9 @@ function drawDentist() {
   ctx.fillStyle = "#e7f6f2";
   ctx.fillRect(-17, -40, 10, 8);
 
+  if (thumbsUp) {
+    drawThumbsUpArm(d);
+  } else {
   // 칫솔 든 팔 (바라보는 방향)
   ctx.fillStyle = "#ffffff";
   ctx.save();
@@ -581,14 +707,25 @@ function drawDentist() {
   ctx.fillStyle = "#e8fbff";
   for (let i = 0; i < 4; i++) ctx.fillRect(d > 0 ? 4 : -10, -47 + i * 3, 6, 2);
   ctx.restore();
+  }
 
   // 머리
   ctx.fillStyle = "#f6cfa8";
   ctx.beginPath(); ctx.arc(0, -76, 17, 0, Math.PI * 2); ctx.fill();
-  // 머리카락
-  ctx.fillStyle = "#3a2a1e";
-  ctx.beginPath(); ctx.arc(0, -80, 17, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
-  ctx.fillRect(-17, -82, 34, 5);
+  // 머리카락 (퓨전 중에는 노랗게 뻗친 머리)
+  if (gold) {
+    ctx.fillStyle = "#ffd700";
+    ctx.beginPath();
+    ctx.moveTo(-18, -78);
+    const tips = [[-24, -96], [-12, -92], [-8, -112], [0, -98], [8, -114], [12, -93], [24, -98], [18, -78]];
+    tips.forEach(([tx, ty]) => ctx.lineTo(tx, ty));
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    ctx.fillStyle = "#3a2a1e";
+    ctx.beginPath(); ctx.arc(0, -80, 17, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+    ctx.fillRect(-17, -82, 34, 5);
+  }
   // 이마 반사경(치과 헤드미러)
   ctx.fillStyle = "#cfd8e3";
   ctx.beginPath(); ctx.arc(0, -90, 6, 0, Math.PI * 2); ctx.fill();
@@ -606,6 +743,78 @@ function drawDentist() {
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(-10, -67); ctx.lineTo(10, -67); ctx.stroke();
 
+  // 안경 (규니)
+  if (glasses) {
+    ctx.strokeStyle = "#222";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(-6 + d * 2, -77, 4.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(6 + d * 2, -77, 4.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-1.5 + d * 2, -77); ctx.lineTo(1.5 + d * 2, -77); ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// 따봉 팔: 주먹 쥐고 엄지 척
+function drawThumbsUpArm(d) {
+  const fx = 36 * d, fy = -66;
+  // 팔 (어깨 → 주먹, 굵은 선)
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "#c5ced8";
+  ctx.lineWidth = 11;
+  ctx.beginPath(); ctx.moveTo(17 * d, -54); ctx.lineTo(fx, fy + 4); ctx.stroke();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 8;
+  ctx.beginPath(); ctx.moveTo(17 * d, -54); ctx.lineTo(fx, fy + 4); ctx.stroke();
+  ctx.restore();
+  // 주먹
+  ctx.fillStyle = "#f6cfa8";
+  ctx.strokeStyle = "#d9a679";
+  ctx.lineWidth = 1.5;
+  // 엄지: 주먹의 몸쪽 끝에서 위로, 살짝 바깥으로 기울게 (주먹 뒤에 먼저 그림)
+  ctx.save();
+  ctx.translate(fx - 5 * d, fy - 4);
+  ctx.rotate(0.15 * d);
+  roundRect(-3, -14, 6.5, 16, 3.2);
+  ctx.fill(); ctx.stroke();
+  // 엄지손톱
+  ctx.fillStyle = "#fbe3cc";
+  roundRect(-1.6, -12.5, 3.8, 4, 1.5);
+  ctx.fill();
+  ctx.restore();
+  // 주먹 (가로로 쥔 손)
+  ctx.fillStyle = "#f6cfa8";
+  roundRect(fx - 8, fy - 5, 17, 14, 4.5);
+  ctx.fill(); ctx.stroke();
+  // 말아 쥔 손가락 마디 줄 (바깥쪽)
+  ctx.strokeStyle = "#d9a679";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 3; i++) {
+    const ly = fy - 1 + i * 3.5;
+    ctx.beginPath();
+    ctx.moveTo(fx + (d > 0 ? 1 : -9), ly);
+    ctx.lineTo(fx + (d > 0 ? 9 : -1), ly);
+    ctx.stroke();
+  }
+}
+
+// 20단계 축하: 화면 가운데 크게 따봉하는 치과의사
+function drawPraise() {
+  if (praiseTime <= 0) return;
+  const total = CONFIG.praiseDuration;
+  const shown = total - praiseTime;
+  const appear = Math.min(1, shown / 0.3);               // 0.3초 동안 커지며 등장
+  const fade = Math.min(1, praiseTime / 0.5);            // 마지막 0.5초 사라짐
+  ctx.save();
+  ctx.globalAlpha = 0.9 * fade;
+  // 뒤쪽 반짝이는 원
+  const g = ctx.createRadialGradient(W / 2, H / 2 - 30, 10, W / 2, H / 2 - 30, 190);
+  g.addColorStop(0, "rgba(255, 240, 150, 0.9)");
+  g.addColorStop(1, "rgba(255, 200, 80, 0)");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(W / 2, H / 2 - 30, 190, 0, Math.PI * 2); ctx.fill();
+  drawDentist(W / 2, 1, 0, { scale: 2.6 * appear, thumbsUp: true, feet: H / 2 + 150 });
   ctx.restore();
 }
 
@@ -666,9 +875,11 @@ function drawLifeTooth(cx, cy, healthy) {
   ctx.restore();
 }
 
+const GUNGSEO = "'Gungsuh', '궁서', '궁서체', 'GungSeo', 'Batang', serif";
+
 function drawPopup(p) {
   ctx.globalAlpha = Math.min(1, p.life * 2);
-  ctx.font = `bold ${p.size}px 'Malgun Gothic', sans-serif`;
+  ctx.font = `bold ${p.size}px ${p.font || "'Malgun Gothic', sans-serif"}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.lineWidth = 6;
@@ -697,6 +908,7 @@ function show(name) {
   Object.values(screens).forEach((s) => s.classList.add("hidden"));
   if (name) screens[name].classList.remove("hidden");
   $("pauseBtn").classList.toggle("hidden", name !== null);
+  $("specialBtn").classList.toggle("hidden", name !== null);
 }
 
 function startGame() {
@@ -749,6 +961,7 @@ $("homeBtn").onclick = goHome;
 $("quitBtn").onclick = goHome;
 $("resumeBtn").onclick = resumeGame;
 $("pauseBtn").onclick = pauseGame;
+$("specialBtn").onclick = useSpecial;
 
 // ---------- 입력 ----------
 window.addEventListener("keydown", (e) => {
@@ -757,6 +970,12 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "p" || e.key === "P" || e.key === "Escape") {
     if (state === "playing") pauseGame();
     else if (state === "paused") resumeGame();
+  }
+  // 필살기: 스페이스바 또는 S
+  if ((e.key === " " || e.key === "s" || e.key === "S") && state === "playing") {
+    e.preventDefault();
+    useSpecial();
+    return;
   }
   if ((e.key === "Enter" || e.key === " ") && (state === "start" || (state === "over" && !screens.over.classList.contains("hidden")))) {
     e.preventDefault();
