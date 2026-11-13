@@ -19,6 +19,7 @@ const CONFIG = {
   playerSpeed: 390,        // 의사 이동 속도 (px/초)
   baseFallSpeed: 240,      // 1단계 낙하 속도 (px/초)
   levelEvery: 8,           // 몇 초마다 단계 상승
+  levelJump: 2,            // 2단계부터 난이도를 몇 단계 앞당길지 (2 → 2단계 = 예전 4단계 난이도)
   maxSpeedMul: 3.0,        // 속도 상한
   minInterval: 0.2,        // 나오는 간격 하한 (초)
   invincibleTime: 0.8,     // 맞은 뒤 무적 시간 (초)
@@ -33,7 +34,9 @@ const CONFIG = {
 const TOOTH_COUNT = 16;    // 윗니 8개 + 아랫니 8개
 
 // 단계별 난이도 계산
-function difficulty(level) {
+function difficulty(shownLevel) {
+  // 1단계는 몸풀기. 2단계부터는 2단계를 건너뛰어(예전 4단계 난이도부터) 시작해서 점점 올라감
+  const level = shownLevel >= 2 ? shownLevel + CONFIG.levelJump : shownLevel;
   const speedMul = Math.min(1 + (level - 1) * 0.16, CONFIG.maxSpeedMul);
   const interval = Math.max(0.85 - (level - 1) * 0.065, CONFIG.minInterval);
   let minCount, maxCount;
