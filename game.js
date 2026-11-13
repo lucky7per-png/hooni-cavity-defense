@@ -21,7 +21,7 @@ const CONFIG = {
   levelEvery: 8,           // 몇 초마다 단계 상승
   maxLevel: 20,            // 최고 단계 (이 단계에서 난이도 최대)
   level2SpeedMul: 1.5,     // 2단계 속도 (예전 4단계 수준으로 시작)
-  maxSpeedMul: 3.5,        // 20단계 속도 (최고)
+  maxSpeedMul: 3.2,        // 20단계 속도 (최고)
   level2Interval: 0.66,    // 2단계 나오는 간격 (초)
   minInterval: 0.18,       // 20단계 나오는 간격 (초, 가장 짧음)
   invincibleTime: 0.8,     // 맞은 뒤 무적 시간 (초)
