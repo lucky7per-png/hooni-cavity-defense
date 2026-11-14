@@ -20,10 +20,10 @@ const CONFIG = {
   baseFallSpeed: 240,      // 1단계 낙하 속도 (px/초)
   levelEvery: 8,           // 몇 초마다 단계 상승
   maxLevel: 20,            // 최고 단계 (이 단계에서 난이도 최대)
-  level2SpeedMul: 1.5,     // 2단계 속도 (예전 4단계 수준으로 시작)
-  maxSpeedMul: 3.0,        // 20단계 속도 (최고)
-  level2Interval: 0.66,    // 2단계 나오는 간격 (초)
-  minInterval: 0.18,       // 20단계 나오는 간격 (초, 가장 짧음)
+  level2SpeedMul: 1.4,     // 2단계 속도 (몸풀기 이후 살짝만 올라감)
+  maxSpeedMul: 2.5,        // 20단계 속도 (최고, 너무 빠르지 않게 조정)
+  level2Interval: 0.75,    // 2단계 나오는 간격 (초)
+  minInterval: 0.28,       // 20단계 나오는 간격 (초, 가장 짧음 — 여유 있게 조정)
   invincibleTime: 0.8,     // 맞은 뒤 무적 시간 (초)
   lanes: 8,                // 단것이 떨어지는 칸 수
   maxLives: 5,             // 생명 최대치 (치약·가그린으로 늘릴 수 있는 한도)
@@ -38,17 +38,17 @@ const CONFIG = {
 const TOOTH_COUNT = 16;    // 윗니 8개 + 아랫니 8개
 
 // 단계별 난이도 계산
-// 1단계는 몸풀기. 2단계에서 한 번에 어려워지고, 20단계까지 고르게 올라감
+// 1단계는 몸풀기. 2단계부터 20단계까지 여유 있게 천천히 올라감
 function difficulty(level) {
-  if (level < 2) return { speedMul: 1, interval: 0.85, minCount: 1, maxCount: 1 };
+  if (level < 2) return { speedMul: 1, interval: 0.9, minCount: 1, maxCount: 1 };
   const t = Math.min(level - 2, CONFIG.maxLevel - 2) / (CONFIG.maxLevel - 2); // 2단계=0 → 20단계=1
   const speedMul = CONFIG.level2SpeedMul + (CONFIG.maxSpeedMul - CONFIG.level2SpeedMul) * t;
   const interval = CONFIG.level2Interval + (CONFIG.minInterval - CONFIG.level2Interval) * t;
   let minCount, maxCount;
-  if (level < 5)       { minCount = 2; maxCount = 2; }
-  else if (level < 10) { minCount = 2; maxCount = 3; }
-  else if (level < 16) { minCount = 3; maxCount = 3; }
-  else                 { minCount = 3; maxCount = 4; }
+  if (level < 5)       { minCount = 1; maxCount = 2; }
+  else if (level < 10) { minCount = 2; maxCount = 2; }
+  else if (level < 16) { minCount = 2; maxCount = 3; }
+  else                 { minCount = 3; maxCount = 3; }
   return { speedMul, interval, minCount, maxCount };
 }
 
