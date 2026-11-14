@@ -73,6 +73,14 @@ h2 { font-size: clamp(26px, 5vh, 36px); color: #ffd1e0; }
 .newRecord { font-size: 20px; color: #ffe68a; font-weight: bold; animation: pop 0.6s ease infinite alternate; }
 @keyframes pop { from { transform: scale(1); } to { transform: scale(1.08); } }
 
+.brushTip {
+  font-size: clamp(18px, 3vh, 24px);
+  font-weight: bold;
+  color: #7fffd4;
+  text-shadow: 0 2px 0 #1b6b56;
+  animation: pop 0.6s ease infinite alternate;
+}
+
 button { font-family: inherit; cursor: pointer; border: none; }
 
 .big {

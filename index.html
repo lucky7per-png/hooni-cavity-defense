@@ -23,6 +23,7 @@
         <div>⏸ 일시정지: <b>P</b> 또는 <b>Esc</b></div>
         <div>✨ 치약·가그린을 받으면 <b>생명 +1</b> (무제한!)</div>
         <div>🦷 생명이 줄면 입속 이가 점점 썩어요!</div>
+        <div>🏁 <b>20레벨</b>을 버텨내면 엔딩!</div>
         <div>⚡ 필살기(한 판에 1번): 오른쪽 아래 버튼 또는 <b>스페이스바</b><br />&nbsp;&nbsp;&nbsp;&nbsp;→ 후니·규니 퓨전! 8초 무적</div>
       </div>
       <p class="best">최고 점수: <span id="startBest">0</span></p>
@@ -49,6 +50,23 @@
       </div>
       <button id="retryBtn" class="big">다시하기</button>
       <button id="homeBtn" class="small">처음으로</button>
+    </div>
+
+    <!-- 20레벨 엔딩 화면 -->
+    <div id="endingScreen" class="overlay hidden">
+      <h2>🎉 너 임마 멋지다! 🎉</h2>
+      <p class="desc">20레벨 클리어!<br />훈이의 이를 끝까지 지켜냈어요.</p>
+      <p class="newRecord hidden" id="endNewRecord">🏆 최고 기록 달성! 🏆</p>
+      <div class="result">
+        <div>점수 <b id="endScore">0</b></div>
+        <div>버틴 시간 <b id="endTime">0.0초</b></div>
+        <div>피한 단것 <b id="endDodged">0개</b></div>
+        <div>받은 치약·가그린 <b id="endHealed">0개</b></div>
+        <div>최고 점수 <b id="endBest">0</b></div>
+      </div>
+      <p class="brushTip">🪥 양치는 꼼꼼히!</p>
+      <button id="endRetryBtn" class="big">다시하기</button>
+      <button id="endHomeBtn" class="small">처음으로</button>
     </div>
   </div>
 

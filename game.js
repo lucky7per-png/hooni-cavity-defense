@@ -51,7 +51,7 @@ function difficulty(level) {
 }
 
 // ---------- 상태 ----------
-let state = "start"; // start | playing | paused | over
+let state = "start"; // start | playing | paused | over | ending
 let player, items, particles, popups;
 let elapsed, spawnTimer, lives, dodged, level, shake, invincible;
 let healTimer, bonus, healed, toothRot, rotOrder;
@@ -227,15 +227,16 @@ function update(dt) {
   if (newLevel > level) {
     level = newLevel;
     if (level === CONFIG.maxLevel) {
-      // 20단계 달성: 따봉 치과의사 + 궁서체 칭찬
+      // 20단계 달성: 따봉 치과의사 + 궁서체 칭찬 후 엔딩으로 종료
       praiseTime = CONFIG.praiseDuration;
       burst(W / 2, H / 2 - 60, "#ffd700", 30);
+      burst(W / 2, H / 2 - 60, "#7fffd4", 20);
       popups.push({ text: "너 임마 멋지다!", x: W / 2, y: H / 2 - 225, life: CONFIG.praiseDuration, size: 48, color: "#ffe14d", font: GUNGSEO, still: true });
+      endGame();
     } else {
       popups.push({ text: "LEVEL UP!", x: W / 2, y: H / 2 - 60, life: 1.2, size: 42, color: "#ffe68a" });
     }
   }
-  if (praiseTime > 0) praiseTime -= dt;
   updateSpecial(dt);
 
   // 의사 이동
@@ -343,6 +344,7 @@ function onHit(it) {
 
 function updateEffects(dt) {
   if (shake > 0) shake -= dt;
+  if (praiseTime > 0) praiseTime -= dt;
   updateTeeth(dt);
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
@@ -896,7 +898,7 @@ function roundRect(x, y, w, h, r) {
 
 // ---------- 화면 전환 ----------
 const $ = (id) => document.getElementById(id);
-const screens = { start: $("startScreen"), pause: $("pauseScreen"), over: $("overScreen") };
+const screens = { start: $("startScreen"), pause: $("pauseScreen"), over: $("overScreen"), ending: $("endingScreen") };
 
 function show(name) {
   Object.values(screens).forEach((s) => s.classList.add("hidden"));
@@ -931,6 +933,25 @@ function goHome() {
   show("start");
 }
 
+// 20레벨(맥스) 도달 시 엔딩: 점수 저장 후 엔딩 화면 표시
+function endGame() {
+  state = "ending";
+  const s = score();
+  const isRecord = s > bestScore;
+  if (isRecord) {
+    bestScore = s;
+    localStorage.setItem("dentistBest", String(bestScore));
+  }
+  $("endScore").textContent = s;
+  $("endTime").textContent = elapsed.toFixed(1) + "초";
+  $("endDodged").textContent = dodged + "개";
+  $("endHealed").textContent = healed + "개";
+  $("endBest").textContent = bestScore;
+  $("endNewRecord").classList.toggle("hidden", !isRecord);
+  // 칭찬 연출이 잠깐 보이도록 살짝 늦게 표시
+  setTimeout(() => { if (state === "ending") show("ending"); }, 2000);
+}
+
 function gameOver() {
   state = "over";
   const s = score();
@@ -953,6 +974,8 @@ $("startBtn").onclick = startGame;
 $("retryBtn").onclick = startGame;
 $("homeBtn").onclick = goHome;
 $("quitBtn").onclick = goHome;
+$("endRetryBtn").onclick = startGame;
+$("endHomeBtn").onclick = goHome;
 $("resumeBtn").onclick = resumeGame;
 $("pauseBtn").onclick = pauseGame;
 $("specialBtn").onclick = useSpecial;
@@ -971,7 +994,7 @@ window.addEventListener("keydown", (e) => {
     useSpecial();
     return;
   }
-  if ((e.key === "Enter" || e.key === " ") && (state === "start" || (state === "over" && !screens.over.classList.contains("hidden")))) {
+  if ((e.key === "Enter" || e.key === " ") && (state === "start" || ((state === "over" || state === "ending") && !screens[state].classList.contains("hidden")))) {
     e.preventDefault();
     startGame();
   }
@@ -1001,7 +1024,7 @@ function loop(now) {
   const dt = Math.min((now - last) / 1000, 0.05); // 너무 큰 시간 점프 방지
   last = now;
   if (state === "playing") update(dt);
-  else if (state === "over") updateEffects(dt);
+  else if (state === "over" || state === "ending") updateEffects(dt);
   draw();
   requestAnimationFrame(loop);
 }
