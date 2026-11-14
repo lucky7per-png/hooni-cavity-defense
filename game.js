@@ -26,10 +26,8 @@ const CONFIG = {
   minInterval: 0.28,       // 20단계 나오는 간격 (초, 가장 짧음 — 여유 있게 조정)
   invincibleTime: 0.8,     // 맞은 뒤 무적 시간 (초)
   lanes: 8,                // 단것이 떨어지는 칸 수
-  maxLives: 5,             // 생명 최대치 (치약·가그린으로 늘릴 수 있는 한도)
   healMinGap: 10,          // 회복 아이템 최소 간격 (초)
   healMaxGap: 17,         // 회복 아이템 최대 간격 (초)
-  fullLifeBonus: 50,       // 생명이 가득 찼을 때 회복 아이템 보너스 점수
   rotSpeed: 1.6,           // 이가 썩어 가는/회복되는 속도
   superDuration: 8,        // 필살기(퓨전) 무적 시간 (초)
   praiseDuration: 3.5,     // 20단계 "너 임마 멋지다!" 표시 시간 (초)
@@ -215,13 +213,9 @@ function onHeal(it) {
   healed++;
   burst(it.x, it.y, "#7fffd4", 12);
   burst(it.x, it.y, "#ffffff", 8);
-  if (lives < CONFIG.maxLives) {
-    lives++;
-    popups.push({ text: "생명 +1 ✨", x: player.x, y: FLOOR_Y - player.h - 20, life: 1.0, size: 26, color: "#7fffd4" });
-  } else {
-    bonus += CONFIG.fullLifeBonus;
-    popups.push({ text: `+${CONFIG.fullLifeBonus}점`, x: player.x, y: FLOOR_Y - player.h - 20, life: 1.0, size: 26, color: "#ffe68a" });
-  }
+  // 생명은 무제한으로 늘어남
+  lives++;
+  popups.push({ text: "생명 +1 ✨", x: player.x, y: FLOOR_Y - player.h - 20, life: 1.0, size: 26, color: "#7fffd4" });
 }
 
 // ---------- 업데이트 ----------
@@ -835,9 +829,9 @@ function drawHUD() {
   ctx.strokeText(bTxt, 12, 39);
   ctx.fillText(bTxt, 12, 39);
 
-  // 생명 (기본 이빨 3개 + 치약·가그린으로 늘어난 만큼)
+  // 생명 (기본 이빨 3개 + 치약·가그린으로 늘어난 만큼 — 개수가 많아지면 간격을 줄여서 표시)
   const slots = Math.max(CONFIG.lives, lives);
-  const gap = 30;
+  const gap = Math.min(30, (W - 130) / slots);
   for (let i = 0; i < slots; i++) {
     drawLifeTooth(W / 2 - ((slots - 1) * gap) / 2 + i * gap, 24, i < lives);
   }
